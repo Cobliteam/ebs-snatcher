@@ -1,7 +1,5 @@
 from __future__ import print_function, unicode_literals
 
-import sys
-import os
 import re
 import argparse
 import logging
@@ -31,6 +29,7 @@ def memoize(f):
         return value
 
     return memoized
+
 
 ec2 = memoize(lambda: boto3.client('ec2'))
 sts = memoize(lambda: boto3.client('sts'))
@@ -74,6 +73,7 @@ def get_instance_info(instance_id):
 
         return None
 
+
 def _filters_with_tags(filters, tag_pairs):
     filters = list(filters)
     for k, v in tag_pairs:
@@ -100,7 +100,6 @@ def find_attached_volumes(id_tags, instance_info, filters=()):
 
 
 def find_available_volumes(id_tags, instance_info, filters=()):
-    instance_id = instance_info['InstanceId']
     availability_zone = instance_info['Placement']['AvailabilityZone']
 
     filters = _filters_with_tags(filters, id_tags)
@@ -166,6 +165,7 @@ def create_volume(id_tags, extra_tags, availability_zone, volume_type,
 
     return volume
 
+
 def _next_device(dev):
     match = re.match(r'(/dev/)?(sd|xvd)([a-z]+)', dev)
     if not match:
@@ -220,9 +220,10 @@ def attach_volume(volume_id, instance_info, device_name='auto'):
         logger.info('Attaching volume %s to instance %s as device %s',
                     volume_id, instance_id, cur_device)
         try:
-            response = ec2().attach_volume(Device=cur_device,
-                                         InstanceId=instance_id,
-                                         VolumeId=volume_id, DryRun=False)
+            ec2().attach_volume(Device=cur_device,
+                                InstanceId=instance_id,
+                                VolumeId=volume_id,
+                                DryRun=False)
         except ClientError as e:
             if device_name != 'auto' or not _is_error_for_device_in_use(e):
                 raise
@@ -334,7 +335,6 @@ def main():
             snapshot = find_existing_snapshot(args.snapshot_search_tag)
             if snapshot:
                 snapshot_id = snapshot['SnapshotId']
-
 
     if not volume_id:
         availability_zone = instance_info['Placement']['AvailabilityZone']

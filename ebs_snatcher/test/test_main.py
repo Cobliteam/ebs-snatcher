@@ -1,5 +1,4 @@
 from datetime import datetime
-from unittest import mock
 
 import pytest
 import boto3
@@ -69,24 +68,6 @@ def test_get_account_id(sts_stub):
     assert main.get_account_id() == '23456789012'
 
     sts_stub.assert_no_pending_responses()
-
-
-def test_get_instance_info(ec2_stub, mocker):
-    instance_id = 'i-12345678'
-    instance_info = {'InstanceId': instance_id}
-
-    ec2_stub.add_response(
-        'describe_instances',
-        {
-            'Reservations': [{
-                'Instances': [instance_info]
-
-            }]
-        },
-        {'InstanceIds': [instance_id], 'DryRun': False})
-
-    assert main.get_instance_info(instance_id) == instance_info
-    ec2_stub.assert_no_pending_responses()
 
 
 def test_get_instance_info(ec2_stub, mocker):
@@ -190,7 +171,6 @@ def test_find_attached_volumes(ec2_stub, mocker):
             [volume_1, volume_2])
 
 
-
 def test_find_available_volumes(ec2_stub, mocker):
     instance_id = 'i-12345678'
     az = 'us-east-1'
@@ -268,7 +248,6 @@ def test_find_existing_snapshots(ec2_stub, mocker):
             'NextToken': next_token
         },
         params.copy())
-
 
     params['NextToken'] = next_token
     ec2_stub.add_response(
