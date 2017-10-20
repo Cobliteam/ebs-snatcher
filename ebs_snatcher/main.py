@@ -45,6 +45,9 @@ def positive_int(s):
 
 
 def key_tag_pair(s):
+    if not isinstance(s, str):
+        raise TypeError('Input must be a string')
+
     try:
         key, value = s.split('=', 1)
     except ValueError:
@@ -60,14 +63,16 @@ def get_account_id():
 
 def get_instance_info(instance_id):
     logger.debug('Retrieving instance info for ID %s', instance_id)
-    info = ec2().describe_instances(InstanceIds=[instance_id], DryRun=False)
-    try:
-        return info['Reservations'][0]['Instances'][0]
-    except (KeyError, IndexError):
-        raise RuntimeError(
-            'Cannot determine information for instance {}'.format(
-                instance_id))
 
+    try:
+        response = ec2().describe_instances(InstanceIds=[instance_id],
+                                            DryRun=False)
+        return response['Reservations'][0]['Instances'][0]
+    except ClientError as e:
+        if e.response['Error']['Code'] != 'InvalidInstanceID.NotFound':
+            raise
+
+        return None
 
 def _filters_with_tags(filters, tag_pairs):
     filters = list(filters)
@@ -120,7 +125,7 @@ def find_existing_snapshot(search_tags, filters=()):
     snapshots = []
 
     responses = paginator.paginate(Filters=filters,
-                                   RestorableByUserIds=[_get_account_id()],
+                                   RestorableByUserIds=[get_account_id()],
                                    DryRun=False)
 
     for response in responses:
