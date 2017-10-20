@@ -7,6 +7,7 @@ import argparse
 import logging
 import json
 from itertools import chain
+from functools import wraps
 
 import boto3
 from botocore.exceptions import ClientError
@@ -15,8 +16,24 @@ from botocore.exceptions import ClientError
 VOLUME_TYPES = set(['standard', 'gp2', 'io1', 'sc1', 'st1'])
 
 logger = logging.getLogger('ebs-snatcher')
-ec2 = boto3.client('ec2')
-sts = boto3.client('sts')
+
+
+def memoize(f):
+    sentinel = object()
+    value = sentinel
+
+    @wraps(f)
+    def memoized(*args, **kwargs):
+        nonlocal value
+        if value is sentinel:
+            value = f(*args, **kwargs)
+
+        return value
+
+    return memoized
+
+ec2 = memoize(lambda: boto3.client('ec2'))
+sts = memoize(lambda: boto3.client('sts'))
 
 
 def positive_int(s):
@@ -36,20 +53,14 @@ def key_tag_pair(s):
     return key, value
 
 
-_account_id = None
-
-def _get_account_id():
-    global _account_id
-    if _account_id is None:
-        _account_id = sts.get_caller_identity()['Account']
-
-    return _account_id
+@memoize
+def get_account_id():
+    return sts().get_caller_identity()['Account']
 
 
 def get_instance_info(instance_id):
     logger.debug('Retrieving instance info for ID %s', instance_id)
-    info = ec2.describe_instances(InstanceIds=[instance_id],
-                                                DryRun=False)
+    info = ec2().describe_instances(InstanceIds=[instance_id], DryRun=False)
     try:
         return info['Reservations'][0]['Instances'][0]
     except (KeyError, IndexError):
@@ -75,7 +86,7 @@ def find_attached_volumes(id_tags, instance_info, filters=()):
         {'Name': 'attachment.status', 'Values': ['attached', 'attaching']}
     ])
 
-    paginator = ec2.get_paginator('describe_volumes')
+    paginator = ec2().get_paginator('describe_volumes')
     volumes = []
     for response in paginator.paginate(Filters=filters, DryRun=False):
         volumes.extend(response['Volumes'])
@@ -93,7 +104,7 @@ def find_available_volumes(id_tags, instance_info, filters=()):
         {'Name': 'availability-zone', 'Values': [availability_zone]}
     ])
 
-    paginator = ec2.get_paginator('describe_volumes')
+    paginator = ec2().get_paginator('describe_volumes')
     volumes = []
     for response in paginator.paginate(Filters=filters, DryRun=False):
         volumes.extend(response['Volumes'])
@@ -105,7 +116,7 @@ def find_existing_snapshot(search_tags, filters=()):
     filters = _filters_with_tags(filters, search_tags)
     filters.append({'Name': 'status', 'Values': ['completed']})
 
-    paginator = ec2.get_paginator('describe_snapshots')
+    paginator = ec2().get_paginator('describe_snapshots')
     snapshots = []
 
     responses = paginator.paginate(Filters=filters,
@@ -137,7 +148,7 @@ def create_volume(id_tags, extra_tags, availability_zone, volume_type,
     else:
         params['Size'] = size
 
-    volume = ec2.create_volume(
+    volume = ec2().create_volume(
         AvailabilityZone=availability_zone,
         VolumeType=volume_type,
         TagSpecifications=[{'ResourceType': 'volume', 'Tags': tags}],
@@ -145,7 +156,7 @@ def create_volume(id_tags, extra_tags, availability_zone, volume_type,
         **params
     )
 
-    waiter = ec2.get_waiter('volume_available')
+    waiter = ec2().get_waiter('volume_available')
     waiter.wait(VolumeIds=[volume['VolumeId']], DryRun=False)
 
     return volume
@@ -196,7 +207,7 @@ def attach_volume(volume_id, instance_info, device_name='auto'):
     instance_id = instance_info['InstanceId']
 
     # Wait until volume is available before attaching it
-    waiter = ec2.get_waiter('volume_available')
+    waiter = ec2().get_waiter('volume_available')
     waiter.wait(VolumeIds=[volume_id], DryRun=False)
 
     cur_device = '/dev/sdb' if device_name == 'auto' else device_name
@@ -204,7 +215,7 @@ def attach_volume(volume_id, instance_info, device_name='auto'):
         logger.info('Attaching volume %s to instance %s as device %s',
                     volume_id, instance_id, cur_device)
         try:
-            response = ec2.attach_volume(Device=cur_device,
+            response = ec2().attach_volume(Device=cur_device,
                                          InstanceId=instance_id,
                                          VolumeId=volume_id, DryRun=False)
         except ClientError as e:
@@ -218,7 +229,7 @@ def attach_volume(volume_id, instance_info, device_name='auto'):
             break
 
     # Wait until attachment finishes
-    waiter = ec2.get_waiter('volume_in_use')
+    waiter = ec2().get_waiter('volume_in_use')
     waiter.wait(
         VolumeIds=[volume_id],
         Filters=[{'Name': 'attachment.status', 'Values': ['attached']}],
