@@ -332,3 +332,72 @@ def test_create_volume(ec2_stub):
 ])
 def test_next_device_name(prefix, dev, next_dev):
     assert main.next_device_name(prefix + dev) == prefix + next_dev
+
+
+def test_attach_volume(ec2_stub):
+    volume_id = 'vol-11111111'
+    instance_id = 'i-11111111'
+    device_name = '/dev/sdx'
+
+    # Add responses for the available waiter
+    ec2_stub.add_response(
+        'describe_volumes',
+        {
+            'Volumes': [{
+                'VolumeId': volume_id,
+                'State': 'creating'
+            }]
+        },
+        {
+            'VolumeIds': [volume_id],
+            'DryRun': False
+        })
+
+    ec2_stub.add_response(
+        'describe_volumes',
+        {
+            'Volumes': [{
+                'VolumeId': volume_id,
+                'State': 'available'
+            }]
+        },
+        {
+            'VolumeIds': [volume_id],
+            'DryRun': False
+        })
+
+
+    # Successfull attachment
+    ec2_stub.add_response(
+        'attach_volume',
+        {
+            'VolumeId': volume_id,
+            'InstanceId': instance_id,
+            'State': 'attaching',
+            'Device': device_name,
+            'AttachTime': datetime(2017, 1, 1, 0, 0, 0)
+        },
+        {
+            'Device': device_name,
+            'InstanceId': instance_id,
+            'VolumeId': volume_id,
+            'DryRun': False
+        })
+
+    # Wait until attachment finishes
+    ec2_stub.add_response(
+        'describe_volumes',
+        {
+            'Volumes': [{
+                'VolumeId': volume_id,
+                'State': 'in-use'
+            }]
+        },
+        {
+            'VolumeIds': [volume_id],
+            'Filters': [{'Name': 'attachment.status', 'Values': ['attached']}],
+            'DryRun': False
+        })
+
+    assert main.attach_volume(volume_id, {'InstanceId': instance_id},
+                              device_name) == device_name

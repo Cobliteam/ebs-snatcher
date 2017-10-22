@@ -218,7 +218,7 @@ def attach_volume(volume_id, instance_info, device_name='auto'):
     waiter = ec2().get_waiter('volume_available')
     waiter.wait(VolumeIds=[volume_id], DryRun=False)
 
-    cur_device = '/dev/sdb' if device_name == 'auto' else device_name
+    cur_device = '/dev/sdf' if device_name == 'auto' else device_name
     while True:
         logger.info('Attaching volume %s to instance %s as device %s',
                     volume_id, instance_id, cur_device)
@@ -228,12 +228,12 @@ def attach_volume(volume_id, instance_info, device_name='auto'):
                                 VolumeId=volume_id,
                                 DryRun=False)
         except ClientError as e:
-            if device_name != 'auto' or not _is_error_for_device_in_use(e):
+            if not _is_error_for_device_in_use(e):
                 raise
 
             logger.info('Selected device name is already in use, trying again '
                         'with the next one')
-            cur_device = _next_device(cur_device)
+            cur_device = next_device_name(cur_device)
         else:
             break
 
