@@ -165,35 +165,38 @@ def create_volume(id_tags, extra_tags, availability_zone, volume_type,
 
     return volume
 
+def _parse_dev_name(s):
+    num = 0
+    for digit, c in enumerate(reversed(s)):
+        digit_val = ord(c) - ord('a')
+        if digit_val > 25:
+            raise ValueError('Bad base26 literal')
 
-def _next_device(dev):
+        if digit > 0:
+            digit_val += 1
+
+        num += (26 ** digit) * digit_val
+
+    return num
+
+def _format_dev_name(n):
+    s = ''
+    while n >= 0:
+        s = chr(ord('a') + n % 26) + s
+        n = n // 26 - 1
+
+    return s
+
+
+def next_device_name(dev):
     match = re.match(r'(/dev/)?(sd|xvd)([a-z]+)', dev)
     if not match:
         raise ValueError('Invalid device name {}'.format(dev))
 
     # Extract the device ID as a list of numbers from the device name
-    path, prefix, dev_id = match.groups()
-    dev_id_parts = [ord(c) - ord('a') for c in dev_id]
-
-    # Increment the version by incrementing each element in reverse order. If it
-    # overflows, carry to the previous element, until we no longer can
-    # (as we reached the start of the list). In that case, add a new element
-    # starting from zero. so the order goes something like:
-    #
-    # sda, sdb, ..., sdz, sdaa, sdab, sdaz, sdba, ... sdzz, sdaaa
-    for i in reversed(range(len(dev_id_parts))):
-        if dev_id_parts[i] == 25:
-            dev_id_parts[i] = 0
-            try:
-                dev_id_parts[i - 1] += 1
-            except IndexError:
-                dev_id_parts.append(0)
-                break
-        else:
-            dev_id_parts[i] += 1
-
-    dev_id = ''.join(chr(ord('a') + d) for d in dev_id_parts)
-    return '{}{}{}'.format(path, prefix, dev_id)
+    path, prefix, dev_name = match.groups()
+    dev_index = _parse_dev_name(dev_name)
+    return '{}{}{}'.format(path or '', prefix, _format_dev_name(dev_index + 1))
 
 
 def _is_error_for_device_in_use(exc):

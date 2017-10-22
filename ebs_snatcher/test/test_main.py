@@ -317,3 +317,18 @@ def test_create_volume(ec2_stub):
         src_snapshot_id=snapshot_id)
 
     assert volume['VolumeId'] == volume_id
+
+
+@pytest.mark.parametrize('prefix', ['sd', 'xvd', '/dev/sd', '/dev/xvd'])
+@pytest.mark.parametrize('dev,next_dev', [
+    ('a', 'b'),
+    ('b', 'c'),
+    ('y', 'z'),
+    ('z', 'aa'),
+    ('aa', 'ab'),
+    ('az', 'ba'),
+    ('bz', 'ca'),
+    ('zz', 'aaa')
+])
+def test_next_device_name(prefix, dev, next_dev):
+    assert main.next_device_name(prefix + dev) == prefix + next_dev
