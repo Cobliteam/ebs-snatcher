@@ -334,10 +334,10 @@ def test_next_device_name(prefix, dev, next_dev):
     assert main.next_device_name(prefix + dev) == prefix + next_dev
 
 
-def test_attach_volume(ec2_stub):
+def test_attach_volume_default_device(ec2_stub):
     volume_id = 'vol-11111111'
     instance_id = 'i-11111111'
-    device_name = '/dev/sdx'
+    device_name = '/dev/sdf'
 
     # Add responses for the available waiter
     ec2_stub.add_response(
@@ -399,5 +399,140 @@ def test_attach_volume(ec2_stub):
             'DryRun': False
         })
 
-    assert main.attach_volume(volume_id, {'InstanceId': instance_id},
-                              device_name) == device_name
+    # Don't pass device name, so the default is used.
+    assert (main.attach_volume(volume_id, {'InstanceId': instance_id}) ==
+            device_name)
+    ec2_stub.assert_no_pending_responses()
+
+
+def test_attach_volume_failure(ec2_stub):
+    volume_id = 'vol-11111111'
+    instance_id = 'i-11111111'
+    device_name = '/dev/sdf'
+
+    # Add responses for the available waiter
+    ec2_stub.add_response(
+        'describe_volumes',
+        {
+            'Volumes': [{
+                'VolumeId': volume_id,
+                'State': 'creating'
+            }]
+        },
+        {
+            'VolumeIds': [volume_id],
+            'DryRun': False
+        })
+
+    ec2_stub.add_response(
+        'describe_volumes',
+        {
+            'Volumes': [{
+                'VolumeId': volume_id,
+                'State': 'available'
+            }]
+        },
+        {
+            'VolumeIds': [volume_id],
+            'DryRun': False
+        })
+
+
+    # Fail the attachment. Any error should work as long as it is not a
+    # 'device already in use' error.
+    ec2_stub.add_client_error(
+        'attach_volume',
+        expected_params={
+            'Device': device_name,
+            'InstanceId': instance_id,
+            'VolumeId': volume_id,
+            'DryRun': False
+        })
+
+    with pytest.raises(ClientError):
+        main.attach_volume(volume_id, {'InstanceId': instance_id}, device_name)
+
+
+def test_attach_volume_device_in_use_retry(ec2_stub):
+    volume_id = 'vol-11111111'
+    instance_id = 'i-11111111'
+    device_in_use = '/dev/sdf'
+    device_ok = '/dev/sdg'
+
+    # Add responses for the available waiter
+    ec2_stub.add_response(
+        'describe_volumes',
+        {
+            'Volumes': [{
+                'VolumeId': volume_id,
+                'State': 'creating'
+            }]
+        },
+        {
+            'VolumeIds': [volume_id],
+            'DryRun': False
+        })
+
+    ec2_stub.add_response(
+        'describe_volumes',
+        {
+            'Volumes': [{
+                'VolumeId': volume_id,
+                'State': 'available'
+            }]
+        },
+        {
+            'VolumeIds': [volume_id],
+            'DryRun': False
+        })
+
+
+    # Fail the first attachment. Any error should work as long as it is not a
+    # 'device already in use' error.
+    error_msg = 'Attachment point {} is already in use'.format(device_in_use)
+    ec2_stub.add_client_error(
+        'attach_volume',
+        service_error_code='InvalidParameterValue',
+        service_message=error_msg,
+        expected_params={
+            'Device': device_in_use,
+            'InstanceId': instance_id,
+            'VolumeId': volume_id,
+            'DryRun': False
+        })
+
+
+    # Expected a retry with the next device name
+    ec2_stub.add_response(
+        'attach_volume',
+        {
+            'VolumeId': volume_id,
+            'InstanceId': instance_id,
+            'State': 'attaching',
+            'Device': device_ok,
+            'AttachTime': datetime(2017, 1, 1, 0, 0, 0)
+        },
+        {
+            'Device': device_ok,
+            'InstanceId': instance_id,
+            'VolumeId': volume_id,
+            'DryRun': False
+        })
+
+    # Wait until attachment finishes
+    ec2_stub.add_response(
+        'describe_volumes',
+        {
+            'Volumes': [{
+                'VolumeId': volume_id,
+                'State': 'in-use'
+            }]
+        },
+        {
+            'VolumeIds': [volume_id],
+            'Filters': [{'Name': 'attachment.status', 'Values': ['attached']}],
+            'DryRun': False
+        })
+
+    assert (main.attach_volume(volume_id, {'InstanceId': instance_id}) ==
+            device_ok)
