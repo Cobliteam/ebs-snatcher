@@ -84,6 +84,8 @@ def test_main_already_attached(mocker, run_main, attached_volume, volume_id,
     assert exit_status == 0
     assert json_out['volume_id'] == volume_id
     assert json_out['attached_device'] == attach_device
+    assert json_out['result'] == 'present'
+    assert json_out['src_snapshot_id'] is None
 
 
 def test_main_available_volume(mocker, run_main, volume_id, attach_device,
@@ -102,6 +104,8 @@ def test_main_available_volume(mocker, run_main, volume_id, attach_device,
     assert exit_status == 0
     assert json_out['volume_id'] == volume_id
     assert json_out['attached_device'] == attach_device
+    assert json_out['result'] == 'attached'
+    assert json_out['src_snapshot_id'] is None
 
     attach_volume.assert_called_once_with(
         volume_id=volume_id,
@@ -133,6 +137,8 @@ def test_main_available_snapshot(mocker, run_main, main_args, snapshot_id,
     assert exit_status == 0
     assert json_out['volume_id'] == volume_id
     assert json_out['attached_device'] == attach_device
+    assert json_out['result'] == 'created'
+    assert json_out['src_snapshot_id'] == snapshot_id
 
     create_volume.assert_called_once_with(
         availability_zone=availability_zone,
@@ -172,6 +178,8 @@ def test_main_create_scratch(mocker, run_main, main_args, snapshot_id,
     assert exit_status == 0
     assert json_out['volume_id'] == volume_id
     assert json_out['attached_device'] == attach_device
+    assert json_out['result'] == 'created'
+    assert json_out['src_snapshot_id'] is None
 
     create_volume.assert_called_once_with(
         availability_zone=availability_zone,

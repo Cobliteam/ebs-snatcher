@@ -104,9 +104,10 @@ def main():
     if attached_volumes:
         volume_id = attached_volumes[0]['VolumeId']
         attached_device = attached_volumes[0]['Attachments'][0]['Device']
-
         logger.info(
             'Found volume already attached to instance: %s', volume_id)
+
+        result = 'present'
     else:
         logger.debug('Looking up existing available volumes in AZ')
         available_volumes = \
@@ -118,6 +119,8 @@ def main():
                 ', '.join(map(lambda v: v['VolumeId'], available_volumes)))
 
             volume_id = available_volumes[0]['VolumeId']
+
+            result = 'attached'
         else:
             logger.info(
                 'Did not find any available volumes in current AZ. Searching '
@@ -126,6 +129,8 @@ def main():
             snapshot = ebs.find_existing_snapshot(args.snapshot_search_tag)
             if snapshot:
                 snapshot_id = snapshot['SnapshotId']
+
+            result = 'created'
 
     if not volume_id:
         availability_zone = instance_info['Placement']['AvailabilityZone']
@@ -154,7 +159,9 @@ def main():
             device_name=args.attach_device)
 
     result = json.dumps({'volume_id': volume_id,
-                         'attached_device': attached_device})
+                         'attached_device': attached_device,
+                         'result': result,
+                         'src_snapshot_id': snapshot_id})
     print(result)
 
     return 0

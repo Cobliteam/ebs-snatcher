@@ -85,11 +85,19 @@ Output
 When no errors are found, the command will exit with status 0, and print a JSON
 document in stdout, containing at least the following keys:
 
-- ``volume_id``: ID of the existing/attached/created EBS volume
-- ``attached_device``: path of the device assigned to the EBS volume
-
-In case of errors, the exit status will be non-zero, and the contents of stdout
-are unspecified.
+:volume_id:
+    ID of the EBS volume that has been attached to the instance
+:attached_device:
+    Path of the device assigned to the volume. Note that this might not match
+    exactly the device name visible inside the instance. For example, modern
+    Linux kernel versions use ``/dev/xvd*`` even if ``/dev/sd*`` is specified
+:result:
+    One of ``present``, ``attached`` or ``created``, indicating the change in
+    volume state (or lack thereof)
+:src_snapshot_id:
+    Contains the snapshot ID used to provision the volume it ``result`` is
+    ``created``. Is ``null`` otherwise, or if the volume was created from
+    scratch
 
 In both cases log messages are printed to stderr.
 
