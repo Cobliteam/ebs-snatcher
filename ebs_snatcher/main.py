@@ -8,7 +8,7 @@ from . import ebs
 logger = logging.getLogger('ebs-snatcher.main')
 
 
-def get_args():
+def get_args():  # pragma: no cover
     argp = argparse.ArgumentParser(
         'ebs-snatcher',
         description='Automatically provision AWS EBS volumes from snapshots')
@@ -155,4 +155,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main()  # pragma: no cover
