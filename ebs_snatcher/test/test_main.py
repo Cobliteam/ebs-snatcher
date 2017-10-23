@@ -169,6 +169,7 @@ def test_find_attached_volumes(ec2_stub, mocker):
     assert (main.find_attached_volumes(tags, {'InstanceId': instance_id},
                                        base_filters) ==
             [volume_1, volume_2])
+    ec2_stub.assert_no_pending_responses()
 
 
 def test_find_available_volumes(ec2_stub, mocker):
@@ -210,6 +211,7 @@ def test_find_available_volumes(ec2_stub, mocker):
 
     assert (main.find_available_volumes(tags, instance_info, base_filters) ==
             [volume_1, volume_2])
+    ec2_stub.assert_no_pending_responses()
 
 
 def test_find_existing_snapshots(ec2_stub, mocker):
@@ -259,6 +261,7 @@ def test_find_existing_snapshots(ec2_stub, mocker):
 
     assert \
         main.find_existing_snapshot(tags, base_filters) == snap_new
+    ec2_stub.assert_no_pending_responses()
 
 
 def test_create_volume(ec2_stub):
@@ -317,6 +320,7 @@ def test_create_volume(ec2_stub):
         src_snapshot_id=snapshot_id)
 
     assert volume['VolumeId'] == volume_id
+    ec2_stub.assert_no_pending_responses()
 
 
 @pytest.mark.parametrize('prefix', ['sd', 'xvd', '/dev/sd', '/dev/xvd'])
