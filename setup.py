@@ -15,7 +15,7 @@ setup(
     license='MIT',
     install_requires=[
         'boto3',
-        'iso8601'
+        'future'
     ],
     entry_points={
         'console_scripts': ['ebs-snatcher=ebs_snatcher.main:main']

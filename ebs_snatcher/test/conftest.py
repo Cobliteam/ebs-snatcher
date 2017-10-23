@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import pytest
 import boto3
 from botocore import UNSIGNED
@@ -29,12 +31,14 @@ def boto3_stub(mocker, svc):
 
 @pytest.fixture
 def ec2_stub(mocker):
-    yield from boto3_stub(mocker, 'ec2')
+    for stub in boto3_stub(mocker, 'ec2'):
+        yield stub
 
 
 @pytest.fixture
 def sts_stub(mocker):
-    yield from boto3_stub(mocker, 'sts')
+    for stub in boto3_stub(mocker, 'sts'):
+        yield stub
 
 
 @pytest.fixture

@@ -1,16 +1,17 @@
+from __future__ import unicode_literals
+
 from functools import wraps
 
 
 def memoize(f):
     sentinel = object()
-    value = sentinel
 
     @wraps(f)
-    def memoized(*args, **kwargs):
-        nonlocal value
-        if value is sentinel:
-            value = f(*args, **kwargs)
+    def memo(*args, **kwargs):
+        if memo.value is sentinel:
+            memo.value = f(*args, **kwargs)
 
-        return value
+        return memo.value
 
-    return memoized
+    memo.value = sentinel
+    return memo
