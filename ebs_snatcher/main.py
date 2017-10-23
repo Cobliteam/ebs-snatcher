@@ -96,11 +96,11 @@ def main():
     attached_volumes = \
         ebs.find_attached_volumes(args.volume_id_tag, instance_info)
     if attached_volumes:
-        logger.info(
-            'Found volume already attached to instance: %s', volume_id)
-
         volume_id = attached_volumes[0]['VolumeId']
         attached_device = attached_volumes[0]['Attachments'][0]['Device']
+
+        logger.info(
+            'Found volume already attached to instance: %s', volume_id)
     else:
         logger.debug('Looking up existing available volumes in AZ')
         available_volumes = \
@@ -142,8 +142,10 @@ def main():
         volume_id = new_volume['VolumeId']
 
     if not attached_device:
-        attached_device = ebs.attach_volume(volume_id, instance_info,
-                                            args.attach_device)
+        attached_device = ebs.attach_volume(
+            volume_id=volume_id,
+            instance_info=instance_info,
+            device_name=args.attach_device)
 
     result = json.dumps({'volume_id': volume_id,
                          'attached_device': attached_device})

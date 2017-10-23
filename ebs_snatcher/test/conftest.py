@@ -35,3 +35,47 @@ def ec2_stub(mocker):
 @pytest.fixture
 def sts_stub(mocker):
     yield from boto3_stub(mocker, 'sts')
+
+
+@pytest.fixture
+def instance_id():
+    return 'i-11111111'
+
+
+@pytest.fixture
+def availability_zone():
+    return 'us-east-1a'
+
+
+@pytest.fixture
+def instance_info(instance_id, availability_zone):
+    return {
+        'InstanceId': instance_id,
+        'Placement': {'AvailabilityZone': availability_zone}
+    }
+
+
+@pytest.fixture
+def volume_id():
+    return 'vol-11111111'
+
+
+@pytest.fixture
+def attach_device():
+    return '/dev/sdf'
+
+
+@pytest.fixture
+def attached_volume(volume_id, instance_id, attach_device):
+    return {
+        'VolumeId': volume_id,
+        'Attachments': [{
+            'Device': attach_device,
+            'InstanceId': instance_id
+        }]
+    }
+
+
+@pytest.fixture
+def snapshot_id():
+    return 'snap-11111111'
