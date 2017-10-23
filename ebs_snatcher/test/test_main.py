@@ -9,8 +9,11 @@ from .. import main
 
 @pytest.mark.parametrize('value,result', [
     ('1', 1),
+    (b'1', 1),
     ('0', ValueError),
+    (b'0', ValueError),
     ('asd', ValueError),
+    (b'asd', ValueError),
     (None, TypeError)
 ])
 def test_positive_int(value, result):
@@ -23,7 +26,11 @@ def test_positive_int(value, result):
 
 @pytest.mark.parametrize('value,result', [
     ('a=b', ('a', 'b')),
+    (b'a=b', ('a', 'b')),
     ('a', ValueError),
+    (b'a', ValueError),
+    ('a=b=c', ('a', 'b=c')),
+    (b'a=b=c', ('a', 'b=c')),
     (None, TypeError)
 ])
 def test_key_tag_pair(value, result):

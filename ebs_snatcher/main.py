@@ -1,5 +1,5 @@
 from __future__ import unicode_literals
-from builtins import str
+from builtins import str, bytes
 
 import argparse
 import json
@@ -71,7 +71,9 @@ def positive_int(s):
 
 
 def key_tag_pair(s):
-    if not isinstance(s, str):
+    if isinstance(s, bytes):
+        s = str(s, 'utf-8')
+    elif not isinstance(s, str):
         raise TypeError('Input must be a string')
 
     try:
