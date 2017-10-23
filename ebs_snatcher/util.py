@@ -1,5 +1,6 @@
 from functools import wraps
 
+
 def memoize(f):
     sentinel = object()
     value = sentinel

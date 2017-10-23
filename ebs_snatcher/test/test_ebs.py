@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import pytest
-import boto3
 from botocore.exceptions import ClientError
 
 from .. import ebs
@@ -120,7 +119,7 @@ def test_find_attached_volumes(ec2_stub, mocker):
         {'Filters': filters, 'DryRun': False, 'NextToken': next_token})
 
     assert (ebs.find_attached_volumes(tags, {'InstanceId': instance_id},
-                                       base_filters) ==
+                                      base_filters) ==
             [volume_1, volume_2])
     ec2_stub.assert_no_pending_responses()
 
@@ -323,7 +322,6 @@ def test_attach_volume_default_device(ec2_stub):
             'DryRun': False
         })
 
-
     # Successfull attachment
     ec2_stub.add_response(
         'attach_volume',
@@ -394,7 +392,6 @@ def test_attach_volume_failure(ec2_stub):
             'DryRun': False
         })
 
-
     # Fail the attachment. Any error should work as long as it is not a
     # 'device already in use' error.
     ec2_stub.add_client_error(
@@ -443,7 +440,6 @@ def test_attach_volume_device_in_use_retry(ec2_stub):
             'DryRun': False
         })
 
-
     # Fail the first attachment. Any error should work as long as it is not a
     # 'device already in use' error.
     error_msg = 'Attachment point {} is already in use'.format(device_in_use)
@@ -457,7 +453,6 @@ def test_attach_volume_device_in_use_retry(ec2_stub):
             'VolumeId': volume_id,
             'DryRun': False
         })
-
 
     # Expected a retry with the next device name
     ec2_stub.add_response(

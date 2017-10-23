@@ -11,6 +11,7 @@ def boto3_stub(mocker, svc):
     mocker.patch('ebs_snatcher.ebs.' + svc, return_value=client)
 
     orig_get_waiter = type(client).get_waiter
+
     def get_waiter_no_delay(*args, **kwargs):
         waiter = orig_get_waiter(client, *args, **kwargs)
         waiter.config.delay = 0

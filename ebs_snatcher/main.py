@@ -47,7 +47,8 @@ def get_args():
         help='Enable encryption and use the given KMS key ID for newly created '
              'volumes')
     argp.add_argument(
-        '--volume-type', metavar='TYPE', choices=VOLUME_TYPES, default='gp2',
+        '--volume-type', metavar='TYPE', choices=ebs.VOLUME_TYPES,
+        default='gp2',
         help='Volume type to use for newly created volumes')
     argp.add_argument(
         '--volume-iops', metavar='COUNT', type=positive_int, default=None,
@@ -84,7 +85,7 @@ def main():
 
     args = get_args()
 
-    instance_info = get_instance_info(args.instance_id)
+    instance_info = ebs.get_instance_info(args.instance_id)
 
     snapshot_id = None
     attached_device = None
@@ -93,7 +94,7 @@ def main():
     logger.debug('Looking up currently attached volumes')
 
     attached_volumes = \
-        find_attached_volumes(args.volume_id_tag, instance_info)
+        ebs.find_attached_volumes(args.volume_id_tag, instance_info)
     if attached_volumes:
         logger.info(
             'Found volume already attached to instance: %s', volume_id)
@@ -103,7 +104,7 @@ def main():
     else:
         logger.debug('Looking up existing available volumes in AZ')
         available_volumes = \
-            find_available_volumes(args.volume_id_tag, instance_info)
+            ebs.find_available_volumes(args.volume_id_tag, instance_info)
         if available_volumes:
             logger.info(
                 'Found available volumes with given specifications in current '
@@ -116,7 +117,7 @@ def main():
                 'Did not find any available volumes in current AZ. Searching '
                 'for a suitable snapshot instead.')
 
-            snapshot = find_existing_snapshot(args.snapshot_search_tag)
+            snapshot = ebs.find_existing_snapshot(args.snapshot_search_tag)
             if snapshot:
                 snapshot_id = snapshot['SnapshotId']
 
@@ -129,7 +130,7 @@ def main():
         else:
             logger.info('Creating volume from snapshot %s', snapshot_id)
 
-        new_volume = create_volume(
+        new_volume = ebs.create_volume(
             id_tags=args.volume_id_tag,
             extra_tags=args.volume_extra_tag,
             availability_zone=availability_zone,
@@ -141,8 +142,8 @@ def main():
         volume_id = new_volume['VolumeId']
 
     if not attached_device:
-        attached_device = attach_volume(volume_id, instance_info,
-                                        args.attach_device)
+        attached_device = ebs.attach_volume(volume_id, instance_info,
+                                            args.attach_device)
 
     result = json.dumps({'volume_id': volume_id,
                          'attached_device': attached_device})

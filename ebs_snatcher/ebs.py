@@ -125,6 +125,7 @@ def create_volume(id_tags, extra_tags, availability_zone, volume_type,
 
     return volume
 
+
 def _parse_dev_name(s):
     num = 0
     for digit, c in enumerate(reversed(s)):
@@ -138,6 +139,7 @@ def _parse_dev_name(s):
         num += (26 ** digit) * digit_val
 
     return num
+
 
 def _format_dev_name(n):
     s = ''
@@ -205,4 +207,3 @@ def attach_volume(volume_id, instance_info, device_name='auto'):
         DryRun=False)
 
     return cur_device
-

@@ -2,6 +2,7 @@ import pytest
 
 from .. import main
 
+
 @pytest.mark.parametrize('value,result', [
     ('1', 1),
     ('0', ValueError),
