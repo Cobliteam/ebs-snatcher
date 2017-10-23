@@ -2,29 +2,9 @@ from datetime import datetime
 
 import pytest
 import boto3
-from botocore.stub import Stubber
 from botocore.exceptions import ClientError
 
 from ebs_snatcher import main
-
-
-def boto3_stub(mocker, svc):
-    client = boto3.client(svc, region_name='us-east-1')
-    stub = Stubber(client)
-    mocker.patch('ebs_snatcher.main.' + svc, return_value=client)
-    stub.activate()
-    yield stub
-    stub.deactivate()
-
-
-@pytest.fixture
-def ec2_stub(mocker):
-    yield from boto3_stub(mocker, 'ec2')
-
-
-@pytest.fixture
-def sts_stub(mocker):
-    yield from boto3_stub(mocker, 'sts')
 
 
 @pytest.mark.parametrize('value,result', [
