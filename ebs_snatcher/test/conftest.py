@@ -8,7 +8,7 @@ from botocore.stub import Stubber
 def boto3_stub(mocker, svc):
     client = boto3.client(svc, config=Config(signature_version=UNSIGNED),
                           region_name='us-east-1')
-    mocker.patch('ebs_snatcher.main.' + svc, return_value=client)
+    mocker.patch('ebs_snatcher.ebs.' + svc, return_value=client)
 
     orig_get_waiter = type(client).get_waiter
     def get_waiter_no_delay(*args, **kwargs):
