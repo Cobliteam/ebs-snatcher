@@ -1,6 +1,6 @@
 pytest
 pytest-mock
-coverage
+pytest-cov
 flake8
 tox
 bumpversion
