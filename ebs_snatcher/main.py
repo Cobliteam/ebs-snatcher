@@ -37,14 +37,15 @@ def get_args():  # pragma: no cover
     argp.add_argument(
         '--attach-device', metavar='PATH|auto', required=True,
         help='Name of device to use when attaching a volume, such as '
-             '"/dev/sdb". Can also be set to "auto", in which case sequential '
-             'device names starting from /dev/sdb will be tried until '
-             'attaching succeeeds')
+             '"/dev/sdb". Can be set to "auto" to use a safe default. '
+             'Device names found to be already in use will be skipped, and the '
+             'next name in alphabetical order will be tried until attachment '
+             'succeeds')
     argp.add_argument(
         '--volume-extra-tag', metavar='KEY=VALUE', type=key_tag_pair,
         action='append',
         help='Extra tags to be applied to newly create volumes, but which are '
-             'not used for identification .')
+             'not used for identification')
     argp.add_argument(
         '--encrypt-kms-key-id', metavar='KEY-ID', default=None,
         help='Enable encryption and use the given KMS key ID for newly created '
