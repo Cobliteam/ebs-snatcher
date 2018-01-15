@@ -65,6 +65,11 @@ def volume_id():
 
 
 @pytest.fixture
+def other_volume_id():
+    return 'vol-22222222'
+
+
+@pytest.fixture
 def attach_device():
     return '/dev/sdf'
 

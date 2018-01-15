@@ -61,14 +61,13 @@ def find_attached_volumes(id_tags, instance_info, filters=()):
     return volumes
 
 
-def find_available_volumes(id_tags, instance_info, filters=()):
-    availability_zone = instance_info['Placement']['AvailabilityZone']
-
+def find_available_volumes(id_tags, instance_info, filters=(), current_az=True):
     filters = _filters_with_tags(filters, id_tags)
-    filters.extend([
-        {'Name': 'status', 'Values': ['creating', 'available']},
-        {'Name': 'availability-zone', 'Values': [availability_zone]}
-    ])
+    filters.append({'Name': 'status', 'Values': ['creating', 'available']})
+    if current_az:
+        availability_zone = instance_info['Placement']['AvailabilityZone']
+        filters.append({'Name': 'availability-zone',
+                        'Values': [availability_zone]})
 
     paginator = ec2().get_paginator('describe_volumes')
     volumes = []
@@ -78,7 +77,7 @@ def find_available_volumes(id_tags, instance_info, filters=()):
     return list(volumes)
 
 
-def find_existing_snapshot(search_tags, filters=()):
+def find_existing_snapshot(search_tags=(), filters=()):
     filters = _filters_with_tags(filters, search_tags)
     filters.append({'Name': 'status', 'Values': ['completed']})
 
@@ -209,3 +208,12 @@ def attach_volume(volume_id, instance_info, device_name='auto'):
         DryRun=False)
 
     return cur_device
+
+
+def delete_volume(volume_id):
+    ec2().delete_volume(VolumeId=volume_id, DryRun=False)
+
+    waiter = ec2().get_waiter('volume_deleted')
+    waiter.wait(VolumeIds=[volume_id], DryRun=False)
+
+    return None

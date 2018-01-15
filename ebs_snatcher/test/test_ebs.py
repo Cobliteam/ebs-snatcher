@@ -490,3 +490,40 @@ def test_attach_volume_device_in_use_retry(ec2_stub):
 
     assert (ebs.attach_volume(volume_id, {'InstanceId': instance_id}) ==
             device_ok)
+
+
+def test_delete_volume(ec2_stub, volume_id):
+    params = {
+        'VolumeId': volume_id,
+        'DryRun': False
+    }
+
+    ec2_stub.add_response(
+        'delete_volume',
+        {},
+        params)
+
+    ec2_stub.add_response(
+        'describe_volumes',
+        {
+            'Volumes': [{
+                'VolumeId': volume_id,
+                'State': 'deleting'
+            }]
+        },
+        {'VolumeIds': [volume_id], 'DryRun': False}
+    )
+
+    ec2_stub.add_response(
+        'describe_volumes',
+        {
+            'Volumes': [{
+                'VolumeId': volume_id,
+                'State': 'deleted'
+            }]
+        },
+        {'VolumeIds': [volume_id], 'DryRun': False}
+    )
+
+    assert ebs.delete_volume(volume_id=volume_id) == None
+    ec2_stub.assert_no_pending_responses()

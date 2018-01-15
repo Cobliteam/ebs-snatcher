@@ -4,6 +4,7 @@ from builtins import str, bytes
 import argparse
 import json
 import logging
+import random
 
 from . import ebs
 
@@ -59,6 +60,12 @@ def get_args():  # pragma: no cover
         help='Number of provisioned I/O operations to assign to newly created '
              'volumes. Make sure to choose an appropriate volume type to '
              'match.')
+    argp.add_argument(
+        '--move-to-current-az', type='store_true', default=False,
+        help="If there is a volume available in a different AZ than the "
+             "current one, instead of skipping it and looking for snapshots "
+             "by tag, try to move it to the current AZ, by cloning it and "
+             "deleting the original.")
 
     return argp.parse_args()
 
@@ -85,6 +92,116 @@ def key_tag_pair(s):
     return key, value
 
 
+class ResourceState(object):
+    def __init__(self, args, instance_info):
+        self.args = args
+        self.instance_info = instance_info
+
+        self.state = None
+        self.volume_id = None
+        self.old_volume_id = None
+        self.snapshot_id = None
+        self.attached_device = None
+
+    def survey(self):
+        logger.debug('Looking up currently attached volumes')
+
+        attached_volumes = \
+            ebs.find_attached_volumes(self.args.volume_id_tag,
+                                      self.instance_info)
+        if attached_volumes:
+            volume_id = attached_volumes[0]['VolumeId']
+            attached_device = attached_volumes[0]['Attachments'][0]['Device']
+            logger.info(
+                'Found volume already attached to instance: %s', volume_id)
+
+            self.state = 'present'
+            self.volume_id = volume_id
+            self.attached_device = attached_device
+            return
+
+        logger.debug('Looking up existing available volumes in AZ')
+
+        volumes = \
+            ebs.find_available_volumes(self.args.volume_id_tag,
+                                       self.instance_info, current_az=True)
+        if volumes:
+            logger.info(
+                'Found available volumes with given specifications in current '
+                'AZ: %s',
+                ', '.join(map(lambda v: v['VolumeId'], volumes)))
+
+            self.state = 'attached'
+            self.volume_id = random.choice(volumes)['VolumeId']
+            return
+
+        if self.args.move_to_current_az:
+            logger.info('Did not find any available volumes in current AZ. '
+                        'Searching for available volumes to move in other AZ')
+
+            other_az_volumes = \
+                ebs.find_available_volumes(self.args.volume_id_tag,
+                                           self.instance_info,
+                                           current_az=False)
+            if other_az_volumes:
+                old_volume_id = random.choice(other_az_volumes)['VolumeId']
+                filters = [{'Name': 'volume-id', 'Values': [old_volume_id]}]
+                snapshot = ebs.find_existing_snapshot(filters=filters)
+
+                self.old_volume_id = old_volume_id
+                self.state = 'created'
+                self.snapshot_id = snapshot['SnapshotId']
+                self.old = old_volume_id
+                return
+
+        logger.info('Did not find any available volumes. Searching for a '
+                    'suitable snapshot instead')
+
+        snapshot = ebs.find_existing_snapshot(
+            search_tags=self.args.snapshot_search_tag)
+        self.state = 'created'
+        self.snapshot_id = snapshot and snapshot['SnapshotId']
+
+    def converge(self):
+        if not self.volume_id:
+            availability_zone = \
+                self.instance_info['Placement']['AvailabilityZone']
+            logger.info('About to create volume in AZ %s', availability_zone)
+
+            if not self.snapshot_id:
+                logger.info('Creating volume from scratch')
+            else:
+                logger.info('Creating volume from snapshot %s',
+                            self.snapshot_id)
+
+            new_volume = ebs.create_volume(
+                id_tags=self.args.volume_id_tag,
+                extra_tags=self.args.volume_extra_tag,
+                availability_zone=availability_zone,
+                volume_type=self.args.volume_type,
+                size=self.args.volume_size,
+                iops=self.args.volume_iops,
+                kms_key_id=self.args.encrypt_kms_key_id,
+                src_snapshot_id=self.snapshot_id)
+
+            self.volume_id = new_volume['VolumeId']
+
+        if not self.attached_device:
+            self.attached_device = ebs.attach_volume(
+                volume_id=self.volume_id,
+                instance_info=self.instance_info,
+                device_name=self.args.attach_device)
+
+        if self.old_volume_id:
+            ebs.delete_volume(volume_id=self.old_volume_id)
+
+    def to_json(self):
+        return {'volume_id': self.volume_id,
+                'attached_device': self.attached_device,
+                'result': self.state,
+                'src_snapshot_id': self.snapshot_id}
+
+
 def main():
     logging.basicConfig(level=logging.WARN)
     logger.setLevel(logging.DEBUG)
@@ -93,77 +210,11 @@ def main():
 
     instance_info = ebs.get_instance_info(args.instance_id)
 
-    snapshot_id = None
-    attached_device = None
-    volume_id = None
+    resource_state = ResourceState(args, instance_info)
+    resource_state.survey()
+    resource_state.converge()
 
-    logger.debug('Looking up currently attached volumes')
-
-    attached_volumes = \
-        ebs.find_attached_volumes(args.volume_id_tag, instance_info)
-    if attached_volumes:
-        volume_id = attached_volumes[0]['VolumeId']
-        attached_device = attached_volumes[0]['Attachments'][0]['Device']
-        logger.info(
-            'Found volume already attached to instance: %s', volume_id)
-
-        result = 'present'
-    else:
-        logger.debug('Looking up existing available volumes in AZ')
-        available_volumes = \
-            ebs.find_available_volumes(args.volume_id_tag, instance_info)
-        if available_volumes:
-            logger.info(
-                'Found available volumes with given specifications in current '
-                'AZ: %s',
-                ', '.join(map(lambda v: v['VolumeId'], available_volumes)))
-
-            volume_id = available_volumes[0]['VolumeId']
-
-            result = 'attached'
-        else:
-            logger.info(
-                'Did not find any available volumes in current AZ. Searching '
-                'for a suitable snapshot instead.')
-
-            snapshot = ebs.find_existing_snapshot(args.snapshot_search_tag)
-            if snapshot:
-                snapshot_id = snapshot['SnapshotId']
-
-            result = 'created'
-
-    if not volume_id:
-        availability_zone = instance_info['Placement']['AvailabilityZone']
-        logger.info('About to create volume in AZ %s', availability_zone)
-
-        if not snapshot_id:
-            logger.info('Creating volume from scratch')
-        else:
-            logger.info('Creating volume from snapshot %s', snapshot_id)
-
-        new_volume = ebs.create_volume(
-            id_tags=args.volume_id_tag,
-            extra_tags=args.volume_extra_tag,
-            availability_zone=availability_zone,
-            volume_type=args.volume_type,
-            size=args.volume_size,
-            iops=args.volume_iops,
-            kms_key_id=args.encrypt_kms_key_id,
-            src_snapshot_id=snapshot_id)
-        volume_id = new_volume['VolumeId']
-
-    if not attached_device:
-        attached_device = ebs.attach_volume(
-            volume_id=volume_id,
-            instance_info=instance_info,
-            device_name=args.attach_device)
-
-    result = json.dumps({'volume_id': volume_id,
-                         'attached_device': attached_device,
-                         'result': result,
-                         'src_snapshot_id': snapshot_id})
-    print(result)
-
+    print(json.dumps(resource_state.to_json()))
     return 0
 
 
