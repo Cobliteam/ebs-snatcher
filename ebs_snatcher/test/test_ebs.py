@@ -525,5 +525,5 @@ def test_delete_volume(ec2_stub, volume_id):
         {'VolumeIds': [volume_id], 'DryRun': False}
     )
 
-    assert ebs.delete_volume(volume_id=volume_id) == None
+    assert ebs.delete_volume(volume_id=volume_id) is None
     ec2_stub.assert_no_pending_responses()
