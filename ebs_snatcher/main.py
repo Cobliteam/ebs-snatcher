@@ -61,7 +61,7 @@ def get_args():  # pragma: no cover
              'volumes. Make sure to choose an appropriate volume type to '
              'match.')
     argp.add_argument(
-        '--move-to-current-az', type='store_true', default=False,
+        '--move-to-current-az', action='store_true', default=False,
         help="If there is a volume available in a different AZ than the "
              "current one, instead of skipping it and looking for snapshots "
              "by tag, try to move it to the current AZ, by cloning it and "
