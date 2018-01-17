@@ -260,33 +260,59 @@ def test_main_replace_current_az(mocker, volume_id, attach_device, main_args,
         device_name=attach_device)
 
 
-def test_main_replace_other_az(mocker, volume_id, snapshot_id, other_volume_id,
+def test_main_replace_other_az(mocker, gen_volume_id, snapshot_id,
                                attach_device, main_args, run_main,
                                availability_zone, instance_info):
     mocker.patch('ebs_snatcher.ebs.find_attached_volumes',
                  return_value=[])
 
-    volume = {'VolumeId': volume_id}
-    snapshot = {'SnapshotId': snapshot_id}
-    other_volume = {'VolumeId': other_volume_id}
+    this_az = availability_zone
+    other_az = availability_zone + 'x'
+
+    old_volume_without_snap_id = gen_volume_id()
+    old_volume_without_snap = \
+        {'VolumeId': old_volume_without_snap_id, 'AvailabilityZone': other_az}
+
+    old_volume_with_snap_id = gen_volume_id()
+    old_volume_with_snap = \
+        {'VolumeId': old_volume_with_snap_id, 'AvailabilityZone': other_az}
+
+    new_volume_id = gen_volume_id()
+    new_volume = \
+        {'VolumeId': new_volume_id, 'AvailabilityZone': this_az}
+
+    snapshot = {'SnapshotId': snapshot_id, 'VolumeId': old_volume_with_snap_id}
 
     def available_volumes(id_tags, instance_info, filters=None,
                           current_az=True):
         if current_az:
             return []
         else:
-            return [volume]
+            return [old_volume_without_snap, old_volume_with_snap]
 
     mocker.patch('ebs_snatcher.ebs.find_available_volumes', autospec=True,
                  side_effect=available_volumes)
 
+    old_volume_without_snap_filters = \
+        [{'Name': 'volume-id', 'Values': [old_volume_without_snap_id]}]
+    old_volume_with_snap_filters = \
+        [{'Name': 'volume-id', 'Values': [old_volume_with_snap_id]}]
+
+    def existing_snapshot(search_tags=(), filters=()):
+        if filters == old_volume_without_snap_filters:
+            return None
+        elif filters == old_volume_with_snap_filters:
+            return snapshot
+
+        assert False
+
     find_existing_snapshot = \
         mocker.patch('ebs_snatcher.ebs.find_existing_snapshot',
-                     return_value=snapshot)
+                     side_effect=existing_snapshot)
 
     create_volume = mocker.patch('ebs_snatcher.ebs.create_volume',
                                  autospec=True,
-                                 return_value=other_volume)
+                                 return_value=new_volume)
 
     attach_volume = mocker.patch('ebs_snatcher.ebs.attach_volume',
                                  return_value=attach_device)
@@ -296,13 +322,14 @@ def test_main_replace_other_az(mocker, volume_id, snapshot_id, other_volume_id,
     main_args.move_to_current_az = True
     exit_status, json_out, err = run_main()
     assert exit_status == 0
-    assert json_out['volume_id'] == other_volume_id
+    assert json_out['volume_id'] == new_volume_id
     assert json_out['attached_device'] == attach_device
     assert json_out['result'] == 'created'
     assert json_out['src_snapshot_id'] == snapshot_id
 
-    find_existing_snapshot.assert_called_once_with(
-        filters=[{'Name': 'volume-id', 'Values': [volume_id]}])
+    find_existing_snapshot.assert_has_calls([
+        mocker.call(filters=old_volume_without_snap_filters),
+        mocker.call(filters=old_volume_with_snap_filters)])
 
     create_volume.assert_called_once_with(
         availability_zone=availability_zone,
@@ -315,9 +342,9 @@ def test_main_replace_other_az(mocker, volume_id, snapshot_id, other_volume_id,
         kms_key_id=main_args.encrypt_kms_key_id)
 
     attach_volume.assert_called_once_with(
-        volume_id=other_volume_id,
+        volume_id=new_volume_id,
         instance_info=instance_info,
         device_name=attach_device)
 
     delete_volume.assert_called_once_with(
-        volume_id=volume_id)
+        volume_id=old_volume_with_snap_id)

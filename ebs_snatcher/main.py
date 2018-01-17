@@ -143,24 +143,37 @@ class ResourceState(object):
                 ebs.find_available_volumes(self.args.volume_id_tag,
                                            self.instance_info,
                                            current_az=False)
-            if other_az_volumes:
-                old_volume_id = random.choice(other_az_volumes)['VolumeId']
+            for old_volume in other_az_volumes:
+                old_volume_id = old_volume['VolumeId']
+                old_az = old_volume['AvailabilityZone']
+                new_az = self.instance_info['Placement']['AvailabilityZone']
+
                 filters = [{'Name': 'volume-id', 'Values': [old_volume_id]}]
                 snapshot = ebs.find_existing_snapshot(filters=filters)
 
-                self.old_volume_id = old_volume_id
+                if snapshot:
+                    snapshot_id = snapshot['SnapshotId']
+                    logger.info(
+                        'Found volume %s in AZ %s, will attempt to move '
+                        'it to current AZ %s. Using snapshot %s.',
+                        old_volume_id, old_az, new_az, snapshot_id)
+
+                    self.state = 'created'
+                    self.snapshot_id = snapshot_id
+                    self.old_volume_id = old_volume_id
+                    break
+            else:
+                logger.info('Did not find any available volumes in other AZ '
+                            'move. Creating new volume from scratch.')
                 self.state = 'created'
-                self.snapshot_id = snapshot['SnapshotId']
-                self.old = old_volume_id
-                return
+        else:
+            logger.info('Did not find any available volumes. Searching for a '
+                        'suitable snapshot instead')
 
-        logger.info('Did not find any available volumes. Searching for a '
-                    'suitable snapshot instead')
-
-        snapshot = ebs.find_existing_snapshot(
-            search_tags=self.args.snapshot_search_tag)
-        self.state = 'created'
-        self.snapshot_id = snapshot and snapshot['SnapshotId']
+            snapshot = ebs.find_existing_snapshot(
+                search_tags=self.args.snapshot_search_tag)
+            self.state = 'created'
+            self.snapshot_id = snapshot and snapshot['SnapshotId']
 
     def converge(self):
         if not self.volume_id:
@@ -203,8 +216,7 @@ class ResourceState(object):
 
 
 def main():
-    logging.basicConfig(level=logging.WARN)
-    logger.setLevel(logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
 
     args = get_args()
 
