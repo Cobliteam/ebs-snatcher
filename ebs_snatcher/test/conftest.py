@@ -88,3 +88,12 @@ def attached_volume(volume_id, instance_id, attach_device):
 @pytest.fixture
 def snapshot_id():
     return 'snap-11111111'
+
+
+def ordered(obj):
+    if isinstance(obj, dict):
+        return sorted((k, ordered(v)) for k, v in obj.items())
+    elif isinstance(obj, (list, tuple)):
+        return sorted(ordered(x) for x in obj)
+    else:
+        return obj

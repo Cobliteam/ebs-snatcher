@@ -5,6 +5,7 @@ from datetime import datetime
 import pytest
 from botocore.exceptions import ClientError
 
+from .conftest import ordered
 from .. import ebs
 
 
@@ -163,8 +164,10 @@ def test_find_available_volumes(ec2_stub, mocker):
         },
         {'Filters': filters, 'DryRun': False, 'NextToken': next_token})
 
-    assert (ebs.find_available_volumes(tags, instance_info, base_filters) ==
-            [volume_1, volume_2])
+    actual_volumes = ebs.find_available_volumes(tags, instance_info,
+                                                base_filters)
+    assert ordered(actual_volumes) == ordered([volume_1, volume_2])
+
     ec2_stub.assert_no_pending_responses()
 
 

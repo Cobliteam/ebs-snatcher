@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import re
 import logging
+import random
 from itertools import chain
 
 import boto3
@@ -74,7 +75,9 @@ def find_available_volumes(id_tags, instance_info, filters=(), current_az=True):
     for response in paginator.paginate(Filters=filters, DryRun=False):
         volumes.extend(response['Volumes'])
 
-    return list(volumes)
+    volumes = list(volumes)
+    random.shuffle(volumes)
+    return volumes
 
 
 def find_existing_snapshot(search_tags=(), filters=()):
