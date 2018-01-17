@@ -1,5 +1,8 @@
 from __future__ import unicode_literals
 
+import string
+import random
+
 import pytest
 import boto3
 from botocore import UNSIGNED
@@ -60,13 +63,16 @@ def instance_info(instance_id, availability_zone):
 
 
 @pytest.fixture
-def volume_id():
-    return 'vol-11111111'
+def gen_volume_id():
+    def gen():
+        return 'vol-' + ''.join(random.choice(string.digits) for _ in range(8))
+
+    return gen
 
 
 @pytest.fixture
-def other_volume_id():
-    return 'vol-22222222'
+def volume_id(gen_volume_id):
+    return gen_volume_id()
 
 
 @pytest.fixture
