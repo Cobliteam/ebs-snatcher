@@ -232,7 +232,7 @@ def find_system_block_device(volume_id, ebs_device_path, retries=10,
     xen_path = ebs_device_path.replace('/sd', '/xvd')
 
     for _ in range(retries):
-        # Try NVME devices tagged with the volumed ID as the serial number first,
+        # Try NVME devices tagged with the vol. ID as the serial number first,
         # as found in the c5/m5 family instances
         if os.path.exists(nvme_path):
             return nvme_path
