@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 import re
 import logging
 import random
+import os.path
+import time
 from itertools import chain
 
 import boto3
@@ -220,3 +222,31 @@ def delete_volume(volume_id):
     waiter.wait(VolumeIds=[volume_id], DryRun=False)
 
     return None
+
+
+def find_system_block_device(volume_id, ebs_device_path, retries=10,
+                             sleep=time.sleep):
+    clean_volume_id = volume_id.replace('-', '')
+    nvme_path = '/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_{}'.format(
+        clean_volume_id)
+    xen_path = ebs_device_path.replace('/sd', '/xvd')
+
+    for _ in range(retries):
+        # Try NVME devices tagged with the volumed ID as the serial number first,
+        # as found in the c5/m5 family instances
+        if os.path.exists(nvme_path):
+            return nvme_path
+
+        # Try Xen Virtual Block Device next
+        if os.path.exists(xen_path):
+            return xen_path
+
+        # Try standard SCSI path last
+        if os.path.exists(ebs_device_path):
+            return ebs_device_path
+
+        # Sleep for a little and try again
+        sleep(10.0)
+
+    # Fall back to the unchanged device
+    return ebs_device_path

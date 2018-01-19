@@ -205,6 +205,9 @@ class ResourceState(object):
                 instance_info=self.instance_info,
                 device_name=self.args.attach_device)
 
+        self.attached_device = \
+            ebs.find_system_block_device(self.volume_id, self.attached_device)
+
         if self.old_volume_id:
             ebs.delete_volume(volume_id=self.old_volume_id)
 

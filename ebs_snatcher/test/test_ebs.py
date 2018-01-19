@@ -530,3 +530,54 @@ def test_delete_volume(ec2_stub, volume_id):
 
     assert ebs.delete_volume(volume_id=volume_id) is None
     ec2_stub.assert_no_pending_responses()
+
+
+DEV_TEST_VOLUME_ID = 'vol-12345678'
+DEV_TEST_NVME_PATH = \
+    '/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol12345678'
+DEV_TEST_XEN_PATH = '/dev/xvda'
+DEV_TEST_EBS_PATH = '/dev/sda'
+DEV_TEST_SCSI_PATH = DEV_TEST_EBS_PATH
+
+
+@pytest.mark.parametrize('nvme_exists,xen_exists,scsi_exists,expected_path', [
+    (False, False, False, DEV_TEST_SCSI_PATH),
+    (False, False, True, DEV_TEST_SCSI_PATH),
+    (False, True, False, DEV_TEST_XEN_PATH),
+    (False, True, True, DEV_TEST_XEN_PATH),
+    (True, False, False, DEV_TEST_NVME_PATH),
+    (True, False, True, DEV_TEST_NVME_PATH),
+    (True, True, False, DEV_TEST_NVME_PATH),
+    (True, True, True, DEV_TEST_NVME_PATH),
+])
+def test_find_system_block_device(mocker, nvme_exists, xen_exists, scsi_exists,
+                                  expected_path):
+    def path_exists(path):
+        if path == DEV_TEST_NVME_PATH:
+            return nvme_exists
+        elif path == DEV_TEST_XEN_PATH:
+            return xen_exists
+        elif path == DEV_TEST_SCSI_PATH:
+            return scsi_exists
+
+        assert False
+
+    mocker.patch('os.path.exists', side_effect=path_exists)
+    sleep = mocker.Mock()
+
+    actual_path = ebs.find_system_block_device(
+        DEV_TEST_VOLUME_ID, DEV_TEST_EBS_PATH, retries=1, sleep=sleep)
+
+    assert actual_path == expected_path
+
+
+def test_find_system_block_device_retry(mocker):
+    mocker.patch('os.path.exists', return_value=False)
+    sleep = mocker.Mock()
+
+    retries = 2
+    ebs.find_system_block_device(
+        DEV_TEST_VOLUME_ID, DEV_TEST_EBS_PATH, retries=2, sleep=sleep)
+
+    assert sleep.call_count == retries
+    sleep.assert_called_with(10.0)

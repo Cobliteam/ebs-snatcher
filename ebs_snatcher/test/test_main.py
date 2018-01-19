@@ -76,6 +76,15 @@ def run_main(capfd, mocker, main_args, instance_info):
     return run_main
 
 
+@pytest.fixture(autouse=True)
+def mock_find_system_block_device(mocker):
+    def find_device(volume_id, ebs_device, retries=None):
+        return ebs_device
+
+    mocker.patch('ebs_snatcher.ebs.find_system_block_device',
+                 side_effect=find_device)
+
+
 def test_main_already_attached(mocker, attached_volume, run_main, volume_id,
                                attach_device, main_args, instance_info):
     find_attached_volumes = \
